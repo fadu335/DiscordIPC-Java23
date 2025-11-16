@@ -43,27 +43,26 @@ public class RichPresence
     private final String joinSecret;
     private final String spectateSecret;
     private final boolean instance;
-    
-    public RichPresence(String state, String details, OffsetDateTime startTimestamp, OffsetDateTime endTimestamp, 
-            String largeImageKey, String largeImageText, String smallImageKey, String smallImageText, 
-            String partyId, int partySize, int partyMax, String matchSecret, String joinSecret, 
-            String spectateSecret, boolean instance)
-    {
+    private final String button1Text;
+    private final String button1Url;
+
+    private final String button2Text;
+    private final String button2Url;
+
+    public RichPresence(String state, String details, OffsetDateTime startTimestamp, OffsetDateTime endTimestamp,
+                        String largeImageKey, String largeImageText, String smallImageKey, String smallImageText,
+                        String partyId, int partySize, int partyMax, String matchSecret, String joinSecret,
+                        String spectateSecret, boolean instance, String button1Text, String button1Url, String button2Text, String button2Url) {
         this.state = state;
         this.details = details;
         this.startTimestamp = startTimestamp;
-        this.endTimestamp = endTimestamp;
-        this.largeImageKey = largeImageKey;
-        this.largeImageText = largeImageText;
-        this.smallImageKey = smallImageKey;
-        this.smallImageText = smallImageText;
-        this.partyId = partyId;
-        this.partySize = partySize;
-        this.partyMax = partyMax;
-        this.matchSecret = matchSecret;
         this.joinSecret = joinSecret;
         this.spectateSecret = spectateSecret;
         this.instance = instance;
+        this.button1Text = button1Text;
+        this.button1Url = button1Url;
+        this.button2Text = button2Text;
+        this.button2Url = button2Url;
     }
 
     /**
@@ -75,27 +74,32 @@ public class RichPresence
      *
      * @return A JSONObject payload for updating a user's Rich Presence.
      */
-    public JSONObject toJson()
-    {
+    public JSONObject toJson() {
+
         return new JSONObject()
                 .put("state", state)
                 .put("details", details)
+                //.put("buttons", sList)
                 .put("timestamps", new JSONObject()
-                        .put("start", startTimestamp==null ? null : startTimestamp.toEpochSecond())
-                        .put("end", endTimestamp==null ? null : endTimestamp.toEpochSecond()))
+                        .put("start", startTimestamp == null ? null : startTimestamp.toEpochSecond())
+                        .put("end", endTimestamp == null ? null : endTimestamp.toEpochSecond()))
                 .put("assets", new JSONObject()
                         .put("large_image", largeImageKey)
                         .put("large_text", largeImageText)
                         .put("small_image", smallImageKey)
                         .put("small_text", smallImageText))
-                .put("party", partyId==null ? null : new JSONObject()
+                .put("party", partyId == null ? null : new JSONObject()
                         .put("id", partyId)
                         .put("size", new JSONArray().put(partySize).put(partyMax)))
-                .put("secrets", new JSONObject()
-                        .put("join", joinSecret)
-                        .put("spectate", spectateSecret)
-                        .put("match", matchSecret))
-                .put("instance", instance);
+                .put("instance", instance)
+
+                .put("buttons", new JSONArray()
+                        .put(new JSONObject()
+                                .put("label", button1Text)
+                                .put("url", button1Url))
+                        .put(new JSONObject()
+                                .put("label", button2Text)
+                                .put("url", button2Url)));
     }
 
     /**
@@ -121,18 +125,22 @@ public class RichPresence
         private String joinSecret;
         private String spectateSecret;
         private boolean instance;
+        private String button1Text = "First Button";
+        private String button1Url = "https://discord.com";
+
+        private String button2Text = "Second Button";
+        private String button2Url = "https://google.com";
 
         /**
          * Builds the {@link RichPresence} from the current state of this builder.
          *
          * @return The RichPresence built.
          */
-        public RichPresence build()
-        {
-            return new RichPresence(state, details, startTimestamp, endTimestamp, 
-                    largeImageKey, largeImageText, smallImageKey, smallImageText, 
-                    partyId, partySize, partyMax, matchSecret, joinSecret, 
-                    spectateSecret, instance);
+        public RichPresence build() {
+            return new RichPresence(state, details, startTimestamp, endTimestamp,
+                    largeImageKey, largeImageText, smallImageKey, smallImageText,
+                    partyId, partySize, partyMax, matchSecret, joinSecret,
+                    spectateSecret, instance, button1Text, button1Url, button2Text, button2Url);
         }
 
         /**
@@ -145,6 +153,44 @@ public class RichPresence
         public Builder setState(String state)
         {
             this.state = state;
+            return this;
+        }
+
+        public Builder setButton1Text(String buttonText) {
+            this.button1Text = buttonText;
+            return this;
+        }
+
+        /**
+         * Sets the url of the button.
+         *
+         * @param buttonUrl The url of the button
+         * @return This Builder.
+         */
+        public Builder setButton1Url(String buttonUrl) {
+            this.button1Url = buttonUrl;
+            return this;
+        }
+
+        /**
+         * Sets the text of the first button.
+         *
+         * @param buttonText The Text that is displayed on the button
+         * @return This Builder.
+         */
+        public Builder setButton2Text(String buttonText) {
+            this.button2Text = buttonText;
+            return this;
+        }
+
+        /**
+         * Sets the url of the button.
+         *
+         * @param buttonUrl The url of the button
+         * @return This Builder.
+         */
+        public Builder setButton2Url(String buttonUrl) {
+            this.button2Url = buttonUrl;
             return this;
         }
 
@@ -268,8 +314,7 @@ public class RichPresence
          *
          * @return This Builder.
          */
-        public Builder setParty(String partyId, int partySize, int partyMax)
-        {
+        public Builder setParty(String partyId, int partySize, int partyMax) {
             this.partyId = partyId;
             this.partySize = partySize;
             this.partyMax = partyMax;
@@ -283,8 +328,7 @@ public class RichPresence
          *
          * @return This Builder.
          */
-        public Builder setMatchSecret(String matchSecret)
-        {
+        public Builder setMatchSecret(String matchSecret) {
             this.matchSecret = matchSecret;
             return this;
         }
@@ -296,8 +340,7 @@ public class RichPresence
          *
          * @return This Builder.
          */
-        public Builder setJoinSecret(String joinSecret)
-        {
+        public Builder setJoinSecret(String joinSecret) {
             this.joinSecret = joinSecret;
             return this;
         }
@@ -309,8 +352,7 @@ public class RichPresence
          *
          * @return This Builder.
          */
-        public Builder setSpectateSecret(String spectateSecret)
-        {
+        public Builder setSpectateSecret(String spectateSecret) {
             this.spectateSecret = spectateSecret;
             return this;
         }
@@ -324,8 +366,7 @@ public class RichPresence
          *
          * @return This Builder.
          */
-        public Builder setInstance(boolean instance)
-        {
+        public Builder setInstance(boolean instance) {
             this.instance = instance;
             return this;
         }
