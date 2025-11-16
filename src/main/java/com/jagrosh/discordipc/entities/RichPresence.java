@@ -53,17 +53,33 @@ public class RichPresence
                         String largeImageKey, String largeImageText, String smallImageKey, String smallImageText,
                         String partyId, int partySize, int partyMax, String matchSecret, String joinSecret,
                         String spectateSecret, boolean instance, String button1Text, String button1Url, String button2Text, String button2Url) {
+
         this.state = state;
         this.details = details;
         this.startTimestamp = startTimestamp;
+        this.endTimestamp = endTimestamp;
+
+        this.largeImageKey = largeImageKey;
+        this.largeImageText = largeImageText;
+        this.smallImageKey = smallImageKey;
+        this.smallImageText = smallImageText;
+
+        this.partyId = partyId;
+        this.partySize = partySize;
+        this.partyMax = partyMax;
+
+        this.matchSecret = matchSecret;
         this.joinSecret = joinSecret;
         this.spectateSecret = spectateSecret;
+
         this.instance = instance;
+
         this.button1Text = button1Text;
         this.button1Url = button1Url;
         this.button2Text = button2Text;
         this.button2Url = button2Url;
     }
+
 
     /**
      * Constructs a {@link JSONObject} representing a payload to send to discord
