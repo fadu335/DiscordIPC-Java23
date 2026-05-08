@@ -24,7 +24,6 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.HashMap;
@@ -36,14 +35,10 @@ public class WindowsPipe extends Pipe
 
     private final RandomAccessFile file;
 
-    WindowsPipe(IPCClient ipcClient, HashMap<String, Callback> callbacks, String location)
+    WindowsPipe(IPCClient ipcClient, HashMap<String, Callback> callbacks, String location) throws IOException
     {
         super(ipcClient, callbacks);
-        try {
-            this.file = new RandomAccessFile(location, "rw");
-        } catch (FileNotFoundException e) {
-            throw new RuntimeException(e);
-        }
+        this.file = new RandomAccessFile(location, "rw");
     }
 
     @Override
