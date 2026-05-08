@@ -62,9 +62,22 @@ public abstract class Pipe {
         {
             try
             {
-                String location = getPipeLocation(i);
-                //LOGGER.debug(String.format("Searching for IPC: %s", location));
-                pipe = createPipe(ipcClient, callbacks, location);
+                pipe = null;
+                IOException lastEx = null;
+                for(String location : getPipeLocations(i))
+                {
+                    try
+                    {
+                        pipe = createPipe(ipcClient, callbacks, location);
+                        break;
+                    }
+                    catch(IOException ex)
+                    {
+                        lastEx = ex;
+                    }
+                }
+                if(pipe == null)
+                    throw lastEx != null ? lastEx : new IOException("No IPC pipe at index " + i);
 
                 pipe.send(Packet.OpCode.HANDSHAKE, new JSONObject().put("v", VERSION).put("client_id", Long.toString(clientId)), null);
 
@@ -157,6 +170,11 @@ public abstract class Pipe {
         {
             return new WindowsPipe(ipcClient, callbacks, location);
         }
+        else if (osName.contains("mac") || osName.contains("darwin")
+                || osName.contains("linux") || osName.contains("nix") || osName.contains("nux"))
+        {
+            return new UnixPipe(ipcClient, callbacks, location);
+        }
         else
         {
             throw new RuntimeException("Unsupported OS: " + osName);
@@ -240,26 +258,43 @@ public abstract class Pipe {
     // a list of system property keys to get IPC file from different unix systems.
     private final static String[] unixPaths = {"XDG_RUNTIME_DIR","TMPDIR","TMP","TEMP"};
 
+    // sub-directories Discord may live in on Linux (Flatpak, Snap, native)
+    private final static String[] unixSubdirs = {
+            "",
+            "/app/com.discordapp.Discord",
+            "/app/com.discordapp.DiscordCanary",
+            "/snap.discord",
+            "/snap.discord-canary"
+    };
+
     /**
-     * Finds the IPC location in the current system.
+     * Returns all candidate IPC socket/pipe locations for the given index.
+     * The first one that opens successfully is used.
      *
-     * @param i Index to try getting the IPC at.
-     *
-     * @return The IPC location.
+     * @param i Index of the IPC slot.
+     * @return Candidate locations in priority order.
      */
-    private static String getPipeLocation(int i)
+    private static String[] getPipeLocations(int i)
     {
-        if(System.getProperty("os.name").contains("Win"))
-            return "\\\\.\\pipe\\discord-ipc-"+i;
-        String tmppath = null;
-        for(String str : unixPaths)
+        String osName = System.getProperty("os.name");
+        if(osName.contains("Win"))
+            return new String[]{ "\\\\.\\pipe\\discord-ipc-" + i };
+
+        java.util.LinkedHashSet<String> bases = new java.util.LinkedHashSet<>();
+        for(String key : unixPaths)
         {
-            tmppath = System.getenv(str);
-            if(tmppath != null)
-                break;
+            String v = System.getenv(key);
+            if(v != null && !v.isEmpty())
+                bases.add(v);
         }
-        if(tmppath == null)
-            tmppath = "/tmp";
-        return tmppath+"/discord-ipc-"+i;
+        bases.add("/tmp");
+
+        java.util.List<String> result = new java.util.ArrayList<>();
+        for(String base : bases)
+        {
+            for(String sub : unixSubdirs)
+                result.add(base + sub + "/discord-ipc-" + i);
+        }
+        return result.toArray(new String[0]);
     }
 }
