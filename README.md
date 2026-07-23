@@ -53,6 +53,13 @@ public class DiscordManager {
             client.setListener(new IPCListener() {
                 @Override
                 public void onReady(IPCClient client) {
+                    client.subscribe(IPCClient.Event.CURRENT_USER_UPDATE);
+                    String discordUsername = client.getDiscordUsername();
+                    String discordNickname = client.getDiscordNickname();
+                    String discordAvatarUrl = client.getDiscordAvatarUrl();
+                    System.out.println("Discord username: " + discordUsername);
+                    System.out.println("Discord nickname: " + discordNickname);
+                    System.out.println("Discord avatar: " + discordAvatarUrl);
                     client.sendRichPresence(createPresence().build());
                 }
             });
@@ -134,6 +141,13 @@ public class DiscordManager {
             client.setListener(new IPCListener() {
                 @Override
                 public void onReady(IPCClient client) {
+                    client.subscribe(IPCClient.Event.CURRENT_USER_UPDATE);
+                    String discordUsername = client.getDiscordUsername();
+                    String discordNickname = client.getDiscordNickname();
+                    String discordAvatarUrl = client.getDiscordAvatarUrl();
+                    System.out.println("Discord username: " + discordUsername);
+                    System.out.println("Discord nickname: " + discordNickname);
+                    System.out.println("Discord avatar: " + discordAvatarUrl);
                     client.sendRichPresence(createPresence().build());
                 }
             });

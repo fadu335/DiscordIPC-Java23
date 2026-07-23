@@ -25,25 +25,41 @@ package com.jagrosh.discordipc.entities;
  */
 public class User
 {
-    private final String name;
+    private final String username;
     private final String discriminator;
     private final long id;
     private final String avatar;
+    private final String globalName;
 
     /**
      * Constructs a new {@link User}.<br>
      * Only implemented internally.
-     * @param name user's name
+     * @param username user's unique Discord username
      * @param discriminator user's discrim
      * @param id user's id
      * @param avatar user's avatar hash, or {@code null} if they have no avatar
      */
-    public User(String name, String discriminator, long id, String avatar)
+    public User(String username, String discriminator, long id, String avatar)
     {
-        this.name = name;
+        this(username, discriminator, id, avatar, null);
+    }
+
+    /**
+     * Constructs a new {@link User}.<br>
+     * Only implemented internally.
+     * @param username user's unique Discord username
+     * @param discriminator user's discriminator
+     * @param id user's id
+     * @param avatar user's avatar hash, or {@code null} if they have no avatar
+     * @param globalName user's global display name, or {@code null} if it is not set
+     */
+    public User(String username, String discriminator, long id, String avatar, String globalName)
+    {
+        this.username = username;
         this.discriminator = discriminator;
         this.id = id;
         this.avatar = avatar;
+        this.globalName = globalName;
     }
 
     /**
@@ -53,7 +69,38 @@ public class User
      */
     public String getName()
     {
-        return name;
+        return username;
+    }
+
+    /**
+     * Gets the User's unique Discord username.
+     *
+     * @return The User's unique Discord username.
+     */
+    public String getUsername()
+    {
+        return username;
+    }
+
+    /**
+     * Gets the User's global Discord display name.
+     *
+     * @return The global display name, or {@code null} if it is not set.
+     */
+    public String getGlobalName()
+    {
+        return globalName;
+    }
+
+    /**
+     * Gets the name Discord should display for this User.
+     * Falls back to the unique username when no global display name is set.
+     *
+     * @return The global display name or unique username.
+     */
+    public String getDisplayName()
+    {
+        return globalName == null || globalName.isBlank() ? username : globalName;
     }
 
     /**
@@ -114,7 +161,35 @@ public class User
      */
     public String getDefaultAvatarId()
     {
-        return DefaultAvatar.values()[Integer.parseInt(getDiscriminator()) % DefaultAvatar.values().length].toString();
+        int legacyIndex;
+        try
+        {
+            legacyIndex = Math.floorMod(Integer.parseInt(discriminator), DefaultAvatar.values().length);
+        }
+        catch(NumberFormatException | NullPointerException ignored)
+        {
+            legacyIndex = 0;
+        }
+        return DefaultAvatar.values()[legacyIndex].toString();
+    }
+
+    /**
+     * Gets the index Discord uses for this User's default avatar.
+     *
+     * @return The default avatar index.
+     */
+    public int getDefaultAvatarIndex()
+    {
+        if(discriminator != null && !discriminator.isBlank() && !"0".equals(discriminator))
+        {
+            try
+            {
+                return Math.floorMod(Integer.parseInt(discriminator), 5);
+            }
+            catch(NumberFormatException ignored) {}
+        }
+
+        return (int) ((id >> 22) % 6);
     }
 
     /**
@@ -124,7 +199,7 @@ public class User
      */
     public String getDefaultAvatarUrl()
     {
-        return "https://discordapp.com/assets/" + getDefaultAvatarId() + ".png";
+        return "https://cdn.discordapp.com/embed/avatars/" + getDefaultAvatarIndex() + ".png";
     }
 
     /**

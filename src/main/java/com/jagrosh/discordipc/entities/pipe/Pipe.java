@@ -21,6 +21,7 @@ import com.jagrosh.discordipc.IPCListener;
 import com.jagrosh.discordipc.entities.Callback;
 import com.jagrosh.discordipc.entities.DiscordBuild;
 import com.jagrosh.discordipc.entities.Packet;
+import com.jagrosh.discordipc.entities.User;
 import com.jagrosh.discordipc.exceptions.NoDiscordClientException;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -38,6 +39,7 @@ public abstract class Pipe {
     PipeStatus status = PipeStatus.CONNECTING;
     IPCListener listener;
     private DiscordBuild build;
+    private User user;
     final IPCClient ipcClient;
     private final HashMap<String,Callback> callbacks;
 
@@ -83,9 +85,17 @@ public abstract class Pipe {
 
                 Packet p = pipe.read(); // this is a valid client at this point
 
-                pipe.build = DiscordBuild.from(p.getJson().getJSONObject("data")
-                        .getJSONObject("config")
+                JSONObject readyData = p.getJson().getJSONObject("data");
+                pipe.build = DiscordBuild.from(readyData.getJSONObject("config")
                         .getString("api_endpoint"));
+                JSONObject readyUser = readyData.getJSONObject("user");
+                pipe.user = new User(
+                        readyUser.getString("username"),
+                        readyUser.optString("discriminator", "0"),
+                        Long.parseLong(readyUser.getString("id")),
+                        readyUser.optString("avatar", null),
+                        readyUser.optString("global_name", null)
+                );
 
                 //LOGGER.debug(String.format("Found a valid client (%s) with packet: %s", pipe.build.name(), p.toString()));
                 // we're done if we found our first choice
@@ -253,6 +263,16 @@ public abstract class Pipe {
     public DiscordBuild getDiscordBuild()
     {
         return build;
+    }
+
+    /**
+     * Gets the Discord user received in the READY handshake.
+     *
+     * @return The connected Discord user.
+     */
+    public User getUser()
+    {
+        return user;
     }
 
     // a list of system property keys to get IPC file from different unix systems.

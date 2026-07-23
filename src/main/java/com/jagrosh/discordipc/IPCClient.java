@@ -59,6 +59,7 @@ public final class IPCClient implements Closeable
     private final long clientId;
     private final HashMap<String,Callback> callbacks = new HashMap<>();
     private volatile Pipe pipe;
+    private volatile User discordUser;
     private IPCListener listener = null;
     private Thread readThread = null;
     
@@ -112,13 +113,17 @@ public final class IPCClient implements Closeable
         checkConnected(false);
         callbacks.clear();
         pipe = null;
+        discordUser = null;
 
-        pipe = Pipe.openPipe(this, clientId, callbacks, preferredOrder);
+        Pipe connectedPipe = Pipe.openPipe(this, clientId, callbacks, preferredOrder);
+        pipe = connectedPipe;
+        discordUser = connectedPipe.getUser();
 
         LOGGER.debug("Client is now connected and ready!");
         if(listener != null)
             listener.onReady(this);
-        startReading();
+        if(pipe == connectedPipe)
+            startReading(connectedPipe);
     }
     
     /**
@@ -230,6 +235,63 @@ public final class IPCClient implements Closeable
     }
 
     /**
+     * Gets the Discord account currently connected to this IPC client.
+     * The user is available before {@link IPCListener#onReady(IPCClient)} is called.
+     *
+     * @return The connected Discord user, or {@code null} before connecting or after disconnecting.
+     */
+    public User getDiscordUser()
+    {
+        return discordUser;
+    }
+
+    /**
+     * Gets the unique username of the Discord account currently connected to this IPC client.
+     *
+     * @return The connected account's username, or {@code null} if the client is not connected.
+     */
+    public String getDiscordUsername()
+    {
+        User user = discordUser;
+        return user == null ? null : user.getUsername();
+    }
+
+    /**
+     * Gets the global display name of the connected Discord account.
+     * Falls back to the unique username if no global display name is set.
+     *
+     * @return The connected account's display name, or {@code null} if the client is not connected.
+     */
+    public String getDiscordDisplayName()
+    {
+        User user = discordUser;
+        return user == null ? null : user.getDisplayName();
+    }
+
+    /**
+     * Convenience alias for {@link #getDiscordDisplayName()}.
+     * This returns the global display name, not a server-specific nickname.
+     *
+     * @return The connected account's display name, or {@code null} if the client is not connected.
+     */
+    public String getDiscordNickname()
+    {
+        return getDiscordDisplayName();
+    }
+
+    /**
+     * Gets the effective avatar URL of the connected Discord account.
+     * This returns a default Discord avatar URL when the account has no custom avatar.
+     *
+     * @return The connected account's avatar URL, or {@code null} if the client is not connected.
+     */
+    public String getDiscordAvatarUrl()
+    {
+        User user = discordUser;
+        return user == null ? null : user.getEffectiveAvatarUrl();
+    }
+
+    /**
      * Attempts to close an open connection to Discord.<br>
      * This can be reopened with another call to {@link #connect(DiscordBuild...)}.
      *
@@ -246,6 +308,8 @@ public final class IPCClient implements Closeable
             pipe.close();
         } catch (IOException e) {
             LOGGER.debug("Failed to close pipe", e);
+        } finally {
+            discordUser = null;
         }
     }
 
@@ -287,6 +351,7 @@ public final class IPCClient implements Closeable
         ACTIVITY_JOIN(true),
         ACTIVITY_SPECTATE(true),
         ACTIVITY_JOIN_REQUEST(true),
+        CURRENT_USER_UPDATE(true),
         /**
          * A backup key, only important if the
          * IPCClient receives an unknown event
@@ -341,14 +406,17 @@ public final class IPCClient implements Closeable
      * Initializes this IPCClient's {@link IPCClient#readThread readThread}
      * and calls the first {@link Pipe#read()}.
      */
-    private void startReading()
+    private void startReading(Pipe activePipe)
     {
         readThread = new Thread(() -> {
             try
             {
                 Packet p;
-                while((p = pipe.read()).getOp() != OpCode.CLOSE)
+                while((p = activePipe.read()).getOp() != OpCode.CLOSE)
                 {
+                    if(pipe != activePipe)
+                        return;
+
                     JSONObject json = p.getJson();
                     Event event = Event.of(json.optString("evt", null));
                     String nonce = json.optString("nonce", null);
@@ -375,13 +443,17 @@ public final class IPCClient implements Closeable
                         case ACTIVITY_JOIN_REQUEST:
                             LOGGER.debug("Reading thread received a 'join request' event.");
                             break;
+
+                        case CURRENT_USER_UPDATE:
+                            LOGGER.debug("Reading thread received a 'current user update' event.");
+                            break;
                             
                         case UNKNOWN:
                             LOGGER.debug("Reading thread encountered an event with an unknown type: " +
                                          json.getString("evt"));
                             break;
                     }
-                    if(listener != null && json.has("cmd") && json.getString("cmd").equals("DISPATCH"))
+                    if(json.has("cmd") && json.getString("cmd").equals("DISPATCH"))
                     {
                         try
                         {
@@ -389,22 +461,42 @@ public final class IPCClient implements Closeable
                             switch(Event.of(json.getString("evt")))
                             {
                                 case ACTIVITY_JOIN:
-                                    listener.onActivityJoin(this, data.getString("secret"));
+                                    if(listener != null)
+                                        listener.onActivityJoin(this, data.getString("secret"));
                                     break;
                                     
                                 case ACTIVITY_SPECTATE:
-                                    listener.onActivitySpectate(this, data.getString("secret"));
+                                    if(listener != null)
+                                        listener.onActivitySpectate(this, data.getString("secret"));
                                     break;
                                     
                                 case ACTIVITY_JOIN_REQUEST:
                                     JSONObject u = data.getJSONObject("user");
                                     User user = new User(
                                         u.getString("username"),
-                                        u.getString("discriminator"),
+                                        u.optString("discriminator", "0"),
                                         Long.parseLong(u.getString("id")),
-                                        u.optString("avatar", null)
+                                        u.optString("avatar", null),
+                                        u.optString("global_name", null)
                                     );
-                                    listener.onActivityJoinRequest(this, data.optString("secret", null), user);
+                                    if(listener != null)
+                                        listener.onActivityJoinRequest(this, data.optString("secret", null), user);
+                                    break;
+
+                                case CURRENT_USER_UPDATE:
+                                    User updatedUser = new User(
+                                        data.getString("username"),
+                                        data.optString("discriminator", "0"),
+                                        Long.parseLong(data.getString("id")),
+                                        data.optString("avatar", null),
+                                        data.optString("global_name", null)
+                                    );
+                                    if(pipe == activePipe)
+                                    {
+                                        discordUser = updatedUser;
+                                        if(listener != null)
+                                            listener.onCurrentUserUpdate(this, updatedUser);
+                                    }
                                     break;
                             }
                         }
@@ -414,9 +506,13 @@ public final class IPCClient implements Closeable
                         }
                     }
                 }
-                pipe.setStatus(PipeStatus.DISCONNECTED);
-                if(listener != null)
-                    listener.onClose(this, p.getJson());
+                activePipe.setStatus(PipeStatus.DISCONNECTED);
+                if(pipe == activePipe)
+                {
+                    discordUser = null;
+                    if(listener != null)
+                        listener.onClose(this, p.getJson());
+                }
             }
             catch(IOException | JSONException ex)
             {
@@ -425,9 +521,13 @@ public final class IPCClient implements Closeable
                 else
                     LOGGER.error("Reading thread encountered an JSONException", ex);
 
-                pipe.setStatus(PipeStatus.DISCONNECTED);
-                if(listener != null)
-                    listener.onDisconnect(this, ex);
+                activePipe.setStatus(PipeStatus.DISCONNECTED);
+                if(pipe == activePipe)
+                {
+                    discordUser = null;
+                    if(listener != null)
+                        listener.onDisconnect(this, ex);
+                }
             }
         });
 

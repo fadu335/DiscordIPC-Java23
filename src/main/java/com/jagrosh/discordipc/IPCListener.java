@@ -76,6 +76,15 @@ public interface IPCListener
     default void onActivityJoinRequest(IPCClient client, String secret, User user) {}
 
     /**
+     * Fired whenever the connected Discord account changes its profile.
+     * Subscribe to {@link IPCClient.Event#CURRENT_USER_UPDATE} to receive this event.
+     *
+     * @param client The IPCClient receiving the event.
+     * @param user The updated connected Discord user.
+     */
+    default void onCurrentUserUpdate(IPCClient client, User user) {}
+
+    /**
      * Fired whenever an {@link IPCClient} is ready and connected to Discord.
      *
      * @param client The now ready IPCClient.
